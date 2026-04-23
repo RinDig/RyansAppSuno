@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Suno Prompt Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="artists-data.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #050510;
+    --surface: #0a0a20;
+    --card: #0f0f28;
+    --card2: #141432;
+    --border: #1a1a38;
+    --border2: #252550;
+    --amber: #ff2d78;
+    --amber-dim: rgba(255,45,120,0.15);
+    --purple: #00f5ff;
+    --purple-dim: rgba(0,245,255,0.15);
+    --cyan: #ffe600;
+    --text: #e2e8f0;
+    --muted: #6b7280;
+    --muted2: #4b5563;
+    --danger: #f87171;
+  }
+
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; }
+  #root { width: 100%; height: 100%; display: flex; flex-direction: column; }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* HEADER */
+  .header {
+    flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; height: 52px; border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    background-image: repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px);
+  }
+  .header-logo { display: flex; align-items: center; gap: 10px; }
+  .header-logo svg { width: 28px; height: 28px; }
+  .header-title { font-family: 'Jost', sans-serif; font-size: 17px; font-weight: 800; letter-spacing: 0.05em; }
+  .header-title span { color: #ff2d78; }
+
+  /* MAIN */
+  .main { flex: 1; display: flex; overflow: hidden; }
+
+  /* LEFT */
+  .artists-panel { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface); }
+  .panel-head { flex-shrink: 0; padding: 12px 14px 8px; border-bottom: 1px solid var(--border); }
+  .panel-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .search-box { width: 100%; padding: 7px 10px; background: var(--card); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: 'DM Sans', inherit; font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .search-box:focus { border-color: var(--amber); }
+  .search-box::placeholder { color: var(--muted2); }
+  .genre-filters { flex-shrink: 0; padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); }
+  .genre-btn { font-size: 10px; font-family: inherit; padding: 3px 8px; background: var(--card); border: 1px solid var(--border2); border-radius: 20px; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .genre-btn:hover { color: var(--text); border-color: var(--genre-color, var(--border2)); }
+  .genre-btn.active { background: var(--genre-bg, var(--amber-dim)); border-color: var(--genre-color, var(--amber)); color: var(--genre-color, var(--amber)); }
+  .artists-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+  .artist-card { padding: 10px 12px; border-radius: 7px; margin-bottom: 5px; background: var(--card); border: 1px solid var(--border); cursor: grab; transition: all 0.15s; position: relative; overflow: hidden; }
+  .artist-card:active { cursor: grabbing; }
+  .artist-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--artist-color, var(--amber)); border-radius: 3px 0 0 3px; opacity: 0.7; }
+  .artist-card:hover { border-color: var(--border2); background: var(--card2); transform: translateX(2px); }
+  .artist-card.dragging { opacity: 0.45; transform: scale(0.97); }
+  .artist-name { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .artist-era { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .artist-tags-preview { display: flex; flex-wrap: wrap; gap: 3px; }
+  .mini-tag { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: rgba(255,255,255,0.05); color: var(--muted); white-space: nowrap; cursor: grab; transition: all 0.1s; border: 1px solid transparent; user-select: none; }
+  .mini-tag:hover { background: rgba(255,255,255,0.1); color: var(--text); border-color: var(--border2); }
+  .add-all-btn { font-size: 9px; padding: 2px 6px; border-radius: 3px; background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); cursor: pointer; font-family: inherit; transition: all 0.15s; white-space: nowrap; }
+  .add-all-btn:hover { background: rgba(245,158,11,0.25); }
+
+  /* CENTER */
+  .canvas-area { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .canvas-head { flex-shrink: 0; padding: 12px 16px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--surface); }
+  .drop-zone { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; background: var(--bg); background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px); background-size: 32px 32px; transition: background-color 0.15s; min-height: 0; }
+  .drop-zone.drag-over { background-color: rgba(245,158,11,0.04); }
+  .drop-zone-hint { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--muted2); padding: 40px 0; pointer-events: none; }
+  .drop-zone-hint svg { width: 32px; height: 32px; opacity: 0.3; }
+  .drop-zone-hint p { font-size: 12px; }
+  .canvas-tags-area { display: flex; flex-wrap: wrap; gap: 7px; align-content: flex-start; }
+  .canvas-tag { display: flex; align-items: center; gap: 6px; padding: 7px 11px 7px 13px; background: var(--card2); border: 1px solid var(--border2); border-radius: 20px; font-size: 13px; font-weight: 500; border-left: 2px solid var(--tag-color, var(--amber)); animation: tagIn 0.15s ease-out; transition: all 0.15s; }
+  .canvas-tag:hover { background: var(--card); }
+  @keyframes tagIn { from { opacity: 0; transform: scale(0.85); } to { opacity: 1; transform: scale(1); } }
+  .tag-remove { width: 14px; height: 14px; border-radius: 50%; background: transparent; border: none; cursor: pointer; color: var(--muted); font-size: 12px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: all 0.1s; padding: 0; font-family: inherit; }
+  .tag-remove:hover { background: var(--danger); color: white; }
+  .canvas-clear-btn { font-size: 10px; font-family: inherit; padding: 3px 10px; background: transparent; border: 1px solid var(--border2); border-radius: 4px; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .canvas-clear-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* RIGHT */
+  .controls-panel { width: 248px; flex-shrink: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; }
+  .ctrl-section { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+  .ctrl-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+  .ctrl-row { margin-bottom: 10px; }
+  .ctrl-name { font-size: 11px; color: var(--muted); margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+  .ctrl-val { color: var(--amber); font-size: 11px; font-weight: 600; }
+  .styled-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 3px; background: linear-gradient(to right, var(--amber) 0%, var(--amber) var(--pct, 50%), var(--border2) var(--pct, 50%)); border-radius: 2px; outline: none; cursor: pointer; }
+  .styled-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--amber); border: 2px solid var(--bg); cursor: pointer; box-shadow: 0 0 6px rgba(245,158,11,0.5); }
+  .pill-group { display: flex; flex-wrap: wrap; gap: 4px; }
+  .pill-btn { font-size: 11px; font-family: inherit; padding: 4px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 20px; color: var(--muted); cursor: grab; transition: all 0.12s; }
+  .pill-btn:active { cursor: grabbing; }
+  .pill-btn:hover { border-color: var(--border2); color: var(--text); }
+  .pill-btn.active { background: var(--purple-dim); border-color: var(--purple); color: var(--purple); }
+  .instr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .instr-btn { font-size: 11px; font-family: inherit; padding: 6px 6px; background: var(--card); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); cursor: grab; transition: all 0.12s; text-align: center; }
+  .instr-btn:active { cursor: grabbing; }
+  .instr-btn:hover { border-color: var(--border2); color: var(--text); }
+  .instr-btn.active { background: rgba(34,211,238,0.1); border-color: var(--cyan); color: var(--cyan); }
+
+  /* CANVAS PROMPT BAR */
+  .canvas-prompt {
+    flex-shrink: 0; border-top: 1px solid var(--border);
+    background: var(--surface); padding: 10px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .prompt-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); white-space: nowrap; padding-top: 8px; }
+  .prompt-text {
+    flex: 1; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; font-size: 12px; line-height: 1.5;
+    resize: none; outline: none; overflow-y: auto; min-height: 36px; max-height: 90px;
+    transition: border-color 0.15s;
+  }
+  .prompt-text:focus { border-color: var(--border2); }
+  .copy-btn { font-size: 10px; font-family: inherit; padding: 5px 12px; background: var(--amber-dim); border: 1px solid rgba(200,9,9,0.3); border-radius: 6px; color: var(--amber); cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0; align-self: flex-end; }
+  .copy-btn:hover { background: rgba(200,9,9,0.2); }
+  .copy-btn.copied { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.4); color: #4ade80; }
+
+  /* TWEAKS */
+  .tweaks-panel { position: fixed; bottom: 140px; right: 16px; z-index: 100; width: 220px; background: var(--card2); border: 1px solid var(--border2); border-radius: 10px; box-shadow: 0 8px 32px rgba(0,0,0,0.6); overflow: hidden; }
+  .tweaks-head { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; font-weight: 600; color: var(--amber); display: flex; justify-content: space-between; align-items: center; }
+  .tweaks-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .tweak-row { display: flex; flex-direction: column; gap: 5px; }
+  .tweak-label { font-size: 10px; color: var(--muted); display: flex; justify-content: space-between; }
+  .tweak-val { color: var(--text); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "accentColor": "#ff2d78",
+  "bgPattern": "grid",
+  "showEra": true,
+  "compactArtists": false
+} /*EDITMODE-END*/;
+
+const GROUPS = ["All", "Pop", "Rock", "Hip-Hop", "Electronic", "Indie", "Metal", "Pop Punk", "Country", "Jazz/Soul", "Classic"];
+
+const GENRE_COLORS = {
+  "All":        "#e2e8f0",
+  "Pop":        "#ff2d78",
+  "Classic":    "#e879f9",
+  "Rock":       "#f97316",
+  "Metal":      "#dc2626",
+  "Pop Punk":   "#fb923c",
+  "Hip-Hop":    "#fbbf24",
+  "Electronic": "#00f5ff",
+  "Indie":      "#a78bfa",
+  "Country":    "#86efac",
+  "Jazz/Soul":  "#34d399",
+};
+
+const MOODS = [
+"Euphoric", "Melancholic", "Aggressive", "Dreamy", "Dark", "Romantic", "Nostalgic", "Rebellious", "Spiritual", "Playful",
+"Anxious", "Hopeful", "Bittersweet", "Haunting", "Triumphant", "Lonely", "Rage", "Tender", "Mysterious", "Frantic",
+"Brooding", "Whimsical", "Serene", "Intense", "Cathartic", "Empowering", "Vulnerable", "Surreal", "Gritty", "Ethereal",
+"Desperate", "Carefree", "Introspective", "Eerie", "Joyful", "Defiant", "Somber", "Electric", "Raw", "Cinematic"];
+
+
+const VOCALS = [
+"Male", "Female", "Duet", "Falsetto", "Baritone", "Rap", "Whisper", "Opera", "No Vocals", "Choir",
+"Tenor", "Alto", "Contralto", "Mezzo-Soprano", "Soprano", "Bass", "Harmonies", "Call & Response",
+"Spoken Word", "Growl", "Scream", "Autotune", "Vocoder", "Lo-fi Vocals", "Layered Vocals",
+"Ad Libs", "Breathy", "Gritty", "Raspy", "Smooth", "Nasal", "Vibrato", "Belting", "Head Voice",
+"Mixed Vocals", "Yodeling", "Scat", "Chant", "Group Vocals"];
+
+
+const ENERGY = [
+"Ambient", "Calm", "Midtempo", "Upbeat", "Intense", "Explosive",
+"Hypnotic", "Driving", "Frenetic", "Meditative", "Brooding", "Soaring",
+"Sparse", "Dense", "Pulsing", "Slow Burn", "Building", "Cathartic Release",
+"Groovy", "Stomping", "Floating", "Tense", "Glacial", "Wall of Sound"];
+
+
+const ERAS = ["1970s", "1980s", "1990s", "2000s", "2010s", "2020s"];
+
+const INSTRUMENTS = [
+"Electric Guitar", "Acoustic Guitar", "Piano", "Synth", "808s", "Strings", "Brass", "Bass", "Drums", "Pedal Steel",
+"Saxophone", "Choir Pads", "Harp", "Flute", "Organ", "Banjo", "Mandolin", "Cello", "Violin", "Trumpet",
+"Trombone", "French Horn", "Ukulele", "Sitar", "Koto", "Marimba", "Vibraphone", "Rhodes", "Wurlitzer",
+"Moog", "Theremin", "Drum Machine", "Sequencer", "Sub Bass", "Distorted Bass", "Upright Bass",
+"12-String Guitar", "Slide Guitar", "Lap Steel", "Classical Guitar", "Nylon String", "Harpsichord",
+"Mellotron", "Omnichord", "Vocoder Pads", "Tabla", "Congas", "Bongos", "Cajon", "Tambourine", "Shakers"];
+
+
+const CTRL_COLORS = {
+  energy: "#00f5ff", mood: "#ff2d78", vocals: "#f0abfc",
+  era: "#ffe600", instr: "#fb923c", bpm: "#ff2d78"
+};
+
+function buildPrompt({ canvasTags, bpm, mood, vocals, era, energy, instruments }) {
+  const parts = [];
+  if (canvasTags.length) parts.push(canvasTags.map((t) => t.tag).join(", "));
+  if (mood.length) parts.push(mood.map((m) => m.toLowerCase()).join(", "));
+  if (energy.length) parts.push(energy.map((e) => e.toLowerCase()).join(", "));
+  if (vocals.length) parts.push(vocals.map((v) => v.toLowerCase() + " vocals").join(", "));
+  if (instruments.length) parts.push(instruments.map((i) => i.toLowerCase()).join(", "));
+  if (bpm) parts.push(`${bpm} bpm`);
+  if (era.length) parts.push(era.join(", "));
+  return parts.join(", ");
+}
+
+function makeDrag(e, tag, color) {
+  e.dataTransfer.setData('tag', tag);
+  e.dataTransfer.setData('color', color);
+}
+
+function ArtistCard({ artist, onDragTag, onAddAll, tweaks }) {
+  const [isDragging, setIsDragging] = useState(false);
+  return (
+    <div
+      className={`artist-card ${isDragging ? 'dragging' : ''}`}
+      style={{ '--artist-color': artist.color }}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('artist', JSON.stringify({ tags: artist.tags, color: artist.color }));
+        setIsDragging(true);
+      }}
+      onDragEnd={() => setIsDragging(false)}>
+      
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div className="artist-name">{artist.name}</div>
+          {tweaks.showEra && <div className="artist-era">{artist.group} · {artist.era}</div>}
+        </div>
+        <button className="add-all-btn" onClick={() => onAddAll(artist)}>+ All</button>
+      </div>
+      <div className="artist-tags-preview">
+        {artist.tags.map((tag) =>
+        <span key={tag} className="mini-tag" draggable
+        onDragStart={(e) => {e.dataTransfer.setData('tag', tag);e.dataTransfer.setData('color', artist.color);}}
+        onClick={() => onDragTag(tag, artist.color)}>
+          {tag}</span>
+        )}
+      </div>
+    </div>);
+
+}
+
+function ControlsPanel({ bpm, setBpm, mood, setMood, vocals, setVocals, era, setEra, energy, setEnergy, instruments, setInstruments, addTag, removeTag }) {
+  const toggle = (list, setList, val, tagStr, color) => {
+    const isActive = list.includes(val);
+    setList((l) => isActive ? l.filter((x) => x !== val) : [...l, val]);
+    if (isActive) removeTag(tagStr); else addTag(tagStr, color);
+  };
+  const bpmPct = ((bpm - 60) / (200 - 60) * 100).toFixed(1);
+  const hint = <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>— click or drag</span>;
+
+  return (
+    <div className="controls-panel">
+      <div className="ctrl-section">
+        <div className="ctrl-label">Tempo</div>
+        <div className="ctrl-row">
+          <div className="ctrl-name">
+            BPM <span className="ctrl-val">{bpm}</span>
+            <span draggable onDragStart={(e) => makeDrag(e, `${bpm} bpm`, CTRL_COLORS.bpm)}
+            style={{ fontSize: '9px', color: 'var(--muted)', cursor: 'grab', marginLeft: 4, padding: '2px 6px', background: 'var(--card)', border: '1px solid var(--border2)', borderRadius: '10px' }}>
+              drag ↗
+            </span>
+          </div>
+          <input type="range" className="styled-slider" min="60" max="200" value={bpm}
+          style={{ '--pct': bpmPct + '%' }} onChange={(e) => setBpm(Number(e.target.value))} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'var(--muted2)', marginTop: 3 }}>
+            <span>60</span><span>130</span><span>200</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="ctrl-section">
+        <div className="ctrl-label">Energy {hint}</div>
+        <div className="pill-group">
+          {ENERGY.map((e) =>
+          <button key={e} className={`pill-btn ${energy.includes(e) ? 'active' : ''}`}
+          draggable onDragStart={(ev) => makeDrag(ev, e.toLowerCase(), CTRL_COLORS.energy)}
+          onClick={() => toggle(energy, setEnergy, e, e.toLowerCase(), CTRL_COLORS.energy)}>{e}</button>
+          )}
+        </div>
+      </div>
+
+      <div className="ctrl-section">
+        <div className="ctrl-label">Mood {hint}</div>
+        <div className="pill-group">
+          {MOODS.map((m) =>
+          <button key={m} className={`pill-btn ${mood.includes(m) ? 'active' : ''}`}
+          draggable onDragStart={(ev) => makeDrag(ev, m.toLowerCase(), CTRL_COLORS.mood)}
+          onClick={() => toggle(mood, setMood, m, m.toLowerCase(), CTRL_COLORS.mood)}>{m}</button>
+          )}
+        </div>
+      </div>
+
+      <div className="ctrl-section">
+        <div className="ctrl-label">Vocal Style {hint}</div>
+        <div className="pill-group">
+          {VOCALS.map((v) =>
+          <button key={v} className={`pill-btn ${vocals.includes(v) ? 'active' : ''}`}
+          draggable onDragStart={(ev) => makeDrag(ev, v.toLowerCase() + ' vocals', CTRL_COLORS.vocals)}
+          onClick={() => toggle(vocals, setVocals, v, v.toLowerCase() + ' vocals', CTRL_COLORS.vocals)}>{v}</button>
+          )}
+        </div>
+      </div>
+
+      <div className="ctrl-section">
+        <div className="ctrl-label">Era {hint}</div>
+        <div className="pill-group">
+          {ERAS.map((e) =>
+          <button key={e} className={`pill-btn ${era.includes(e) ? 'active' : ''}`}
+          draggable onDragStart={(ev) => makeDrag(ev, e, CTRL_COLORS.era)}
+          onClick={() => toggle(era, setEra, e, e, CTRL_COLORS.era)}>{e}</button>
+          )}
+        </div>
+      </div>
+
+      <div className="ctrl-section" style={{ borderBottom: 'none' }}>
+        <div className="ctrl-label">Instrumentation {hint}</div>
+        <div className="instr-grid">
+          {INSTRUMENTS.map((i) =>
+          <button key={i} className={`instr-btn ${instruments.includes(i) ? 'active' : ''}`}
+          draggable onDragStart={(ev) => makeDrag(ev, i.toLowerCase(), CTRL_COLORS.instr)}
+          onClick={() => toggle(instruments, setInstruments, i, i.toLowerCase(), CTRL_COLORS.instr)}>{i}</button>
+          )}
+        </div>
+      </div>
+    </div>);
+
+}
+
+function App() {
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+  const [showTweaks, setShowTweaks] = useState(false);
+  const [search, setSearch] = useState('');
+  const [group, setGroup] = useState('All');
+  const [canvasTags, setCanvasTags] = useState([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [bpm, setBpm] = useState(120);
+  const [mood, setMood] = useState([]);
+  const [vocals, setVocals] = useState([]);
+  const [era, setEra] = useState([]);
+  const [energy, setEnergy] = useState([]);
+  const [instruments, setInstruments] = useState([]);
+  const [promptText, setPromptText] = useState('');
+  const [copiedPrompt, setCopiedPrompt] = useState(false);
+
+  const filtered = ARTISTS.filter((a) => {
+    const matchGroup = group === 'All' || a.group === group;
+    const matchSearch = !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
+    return matchGroup && matchSearch;
+  });
+
+  const addTag = (tag, color) => setCanvasTags((prev) => prev.some((t) => t.tag === tag) ? prev : [...prev, { tag, color }]);
+  const addAll = (artist) => setCanvasTags((prev) => {
+    const ex = new Set(prev.map((t) => t.tag));
+    return [...prev, ...artist.tags.filter((t) => !ex.has(t)).map((t) => ({ tag: t, color: artist.color }))];
+  });
+  const removeTag = (tag) => setCanvasTags((prev) => prev.filter((t) => t.tag !== tag));
+
+  useEffect(() => {
+    setPromptText(buildPrompt({ canvasTags, bpm, mood, vocals, era, energy, instruments }));
+  }, [canvasTags, bpm, mood, vocals, era, energy, instruments]);
+
+  const copy = (text, setCopied) => {
+    navigator.clipboard.writeText(text).then(() => {setCopied(true);setTimeout(() => setCopied(false), 2000);});
+  };
+
+  useEffect(() => {
+    window.addEventListener('message', (e) => {
+      if (e.data?.type === '__activate_edit_mode') setShowTweaks(true);
+      if (e.data?.type === '__deactivate_edit_mode') setShowTweaks(false);
+    });
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+  }, []);
+
+  const updateTweak = (key, val) => {
+    const next = { ...tweaks, [key]: val };
+    setTweaks(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: val } }, '*');
+  };
+
+  return (
+    <>
+      <header className="header">
+        <div className="header-logo">
+          <svg viewBox="0 0 28 28" fill="none">
+            <circle cx="14" cy="14" r="13" stroke="#ff2d78" strokeWidth="1.5" />
+            <path d="M8 18 L8 10 L14 14 Z" fill="#ff2d78" />
+            <circle cx="18" cy="10" r="2.5" fill="#00f5ff" />
+            <line x1="18" y1="12.5" x2="18" y2="20" stroke="#00f5ff" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <span className="header-title">SUNO <span style={{ color: '#ff2d78' }}>PROMPT</span> GENERATOR</span>
+        </div>
+      </header>
+
+      <div className="main">
+        <div className="artists-panel">
+          <div className="panel-head">
+            <div className="panel-label">Artists & Bands ({filtered.length})</div>
+            <input className="search-box" placeholder="Search artist or tag..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="genre-filters">
+            {GROUPS.map((g) => {
+              const c = GENRE_COLORS[g] || '#e2e8f0';
+              const bg = `${c}1e`;
+              return <button key={g} className={`genre-btn ${group === g ? 'active' : ''}`}
+                style={{'--genre-color': c, '--genre-bg': bg}}
+                onClick={() => setGroup(g)}>{g}</button>;
+            })}
+          </div>
+          <div className="artists-list">
+            {filtered.map((a) =>
+            <ArtistCard key={a.name} artist={a} onDragTag={addTag} onAddAll={addAll} tweaks={tweaks} />
+            )}
+            {filtered.length === 0 && <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '12px', padding: '24px 0' }}>No artists found</div>}
+          </div>
+        </div>
+
+        <div className="canvas-area">
+          <div className="canvas-head">
+            <div>
+              <div style={{ fontSize: '9px', letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 2, fontFamily: "Arial" }}>Tag Canvas</div>
+              <div style={{ fontSize: '11px', color: 'var(--muted)' }}>
+                {canvasTags.length === 0 ? 'Drag artist cards, tags, or controls here' : `${canvasTags.length} tag${canvasTags.length !== 1 ? 's' : ''} selected`}
+              </div>
+            </div>
+            {canvasTags.length > 0 && <button className="canvas-clear-btn" onClick={() => setCanvasTags([])}>Clear all</button>}
+          </div>
+          <div className={`drop-zone ${dragOver ? 'drag-over' : ''}`}
+          onDragOver={(e) => {e.preventDefault();setDragOver(true);}}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();setDragOver(false);
+            const artistData = e.dataTransfer.getData('artist');
+            if (artistData) {const { tags, color } = JSON.parse(artistData);tags.forEach((t) => addTag(t, color));return;}
+            const tag = e.dataTransfer.getData('tag');
+            const color = e.dataTransfer.getData('color');
+            if (tag) addTag(tag, color);
+          }}>
+            
+            {canvasTags.length === 0 ?
+            <div className="drop-zone-hint">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M12 5v14M5 12l7 7 7-7" />
+                </svg>
+                <p>Drag artist cards, individual tags, or controls here</p>
+                <p style={{ fontSize: '10px', marginTop: 4 }}>Everything on this page is draggable</p>
+              </div> :
+
+            <div className="canvas-tags-area">
+                {canvasTags.map(({ tag, color }) =>
+              <span key={tag} className="canvas-tag" style={{ '--tag-color': color }}>
+                    {tag}
+                    <button className="tag-remove" onClick={() => removeTag(tag)}>×</button>
+                  </span>
+              )}
+              </div>
+            }
+          </div>
+          <div className="canvas-prompt">
+            <span className="prompt-label">Suno<br/>Prompt</span>
+            <textarea className="prompt-text" value={promptText} onChange={(e) => setPromptText(e.target.value)}
+              placeholder="Add tags to generate your prompt..." spellCheck={false} />
+            <button className={`copy-btn ${copiedPrompt ? 'copied' : ''}`} onClick={() => copy(promptText, setCopiedPrompt)}>
+              {copiedPrompt ? '✓ Copied' : 'Copy'}
+            </button>
+          </div>
+        </div>
+
+        <ControlsPanel
+          bpm={bpm} setBpm={setBpm} mood={mood} setMood={setMood}
+          vocals={vocals} setVocals={setVocals} era={era} setEra={setEra}
+          energy={energy} setEnergy={setEnergy} instruments={instruments} setInstruments={setInstruments}
+          addTag={addTag} removeTag={removeTag} />
+        
+      </div>
+
+      {showTweaks &&
+      <div className="tweaks-panel">
+          <div className="tweaks-head">
+            Tweaks
+            <button style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: '14px' }} onClick={() => setShowTweaks(false)}>×</button>
+          </div>
+          <div className="tweaks-body">
+            <div className="tweak-row">
+              <div className="tweak-label">Accent Color <span className="tweak-val">{tweaks.accentColor}</span></div>
+              <input type="color" value={tweaks.accentColor} onChange={(e) => updateTweak('accentColor', e.target.value)}
+            style={{ width: '100%', height: '28px', background: 'none', border: '1px solid var(--border2)', borderRadius: '4px', cursor: 'pointer' }} />
+            </div>
+            <div className="tweak-row">
+              <div className="tweak-label">Show Artist Era</div>
+              <div className="pill-group">
+                {['Yes', 'No'].map((v) =>
+              <button key={v} className={`pill-btn ${(tweaks.showEra ? 'Yes' : 'No') === v ? 'active' : ''}`}
+              onClick={() => updateTweak('showEra', v === 'Yes')}>{v}</button>
+              )}
+              </div>
+            </div>
+            <div className="tweak-row">
+              <div className="tweak-label">Artist Card Density</div>
+              <div className="pill-group">
+                {['Normal', 'Compact'].map((v) =>
+              <button key={v} className={`pill-btn ${(tweaks.compactArtists ? 'Compact' : 'Normal') === v ? 'active' : ''}`}
+              onClick={() => updateTweak('compactArtists', v === 'Compact')}>{v}</button>
+              )}
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </>);
+
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
